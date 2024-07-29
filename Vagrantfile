@@ -18,18 +18,22 @@ Vagrant.configure("2") do |config|
   config.vm.provision "file", source: "~/.vimrc", destination: ".vimrc"
   config.vm.provision "file", source: "~/.gitconfig", destination: ".gitconfig"
 
+  config.vm.provision "tools", type: "shell", privileged: false, inline: <<-TOOLS
+    sudo dnf install -y git
+  TOOLS
+
   config.vm.provision "go", type: "shell", privileged: false, inline: <<-GO
     curl -L -O https://go.dev/dl/go1.22.5.linux-amd64.tar.gz
 
-    sudo tar -C /usr/local -xvf go.dev/dl/go1.22.5.linux-amd64.tar.gz
+    sudo tar -C /usr/local -xvf go1.22.5.linux-amd64.tar.gz
 
     echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/vagrant/.bashrc
     echo 'export PATH=$PATH:$GOPATH' >> /home/vagrant/.bashrc
   GO
 
-  config.vm.provision "staticcheck", type: "shell", privileged: false, inline: <<-INSTALL
+  config.vm.provision "staticcheck", type: "shell", privileged: false, inline: <<-CHECK
     go install honnef.co/go/tools/cmd/staticcheck@latest
-  INSTALL
+  CHECK
 
   config.vm.provision "pre-commit", type: "shell", privileged: false, inline: <<-PRECOMMIT
     python3 -m ensurepip --upgrade

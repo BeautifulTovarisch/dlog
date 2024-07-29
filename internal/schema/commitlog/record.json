@@ -1,0 +1,8 @@
+{
+  "type": "record",
+  "name": "Record",
+  "fields": [
+    {"name": "offset", "type": "long"},
+    {"name": "value", "type": "bytes"}
+  ]
+}

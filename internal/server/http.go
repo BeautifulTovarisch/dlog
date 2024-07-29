@@ -152,7 +152,10 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 // are encoded and outputs decoded according to [in] and [out], otherwise this
 // function behaves exactly like [Route] with the important exception that the
 // input type must be an [interface{}].
-func RouteAvro[Req any, Res any](path string, in, out goavro.Codec, f Handler[interface{}, Res]) {
+//
+// If [in] or [out] are nil, the corresponding operation for that codec is not
+// performed.
+func RouteAvro[Req any, Res any](path string, in, out *goavro.Codec, f Handler[Req, Res]) {
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -161,11 +164,19 @@ func RouteAvro[Req any, Res any](path string, in, out goavro.Codec, f Handler[in
 			return
 		}
 
-		req, _, err := in.NativeFromTextual(body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+		var req Req
+		// Optionally decode the input into the specified type.
+		if in != nil {
+			native, _, err := in.NativeFromTextual(body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 
-			return
+				return
+			}
+
+			if v, ok := native.(Req); ok {
+				req = v
+			}
 		}
 
 		res, err := handleRequest(req, w, r, f)
@@ -177,14 +188,22 @@ func RouteAvro[Req any, Res any](path string, in, out goavro.Codec, f Handler[in
 			return
 		}
 
-		binary, err := out.BinaryFromNative(nil, res)
-		if err != nil {
-			w.Write([]byte(err.Error()))
+		// Optionally decode the output
+		if out != nil {
+			binary, err := out.BinaryFromNative(nil, res)
+			if err != nil {
+				w.Write([]byte(err.Error()))
+
+				return
+			}
+
+			w.Write(binary)
 
 			return
 		}
 
-		w.Write(binary)
+		// Write nothing to the client.
+		w.Write([]byte{})
 	})
 }
 

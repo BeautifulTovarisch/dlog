@@ -11,7 +11,7 @@ import (
 
 // Provide paths to schemas for convenience and future-proofing.
 const (
-	COMMIT_LOG_RECORD = "commitlog/record.json"
+	COMMIT_LOG_RECORD = "./internal/schema/commitlog/record.json"
 )
 
 // MakeCodec accepts a path to an avro schema and produces a [goavro.Codec].

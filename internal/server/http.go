@@ -67,6 +67,9 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 			return
 		}
 
+		// Allow these default headers to be overwritten by the handler
+		w.Header().Set("Content-Type", "application/json")
+
 		// Perform the actual request.
 		res, err := f(req, w, r)
 		if err != nil {
@@ -77,8 +80,9 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 
 		// Provider ResponseWriter as a write stream and simply pipe [res] to the
 		// client.
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(res)
+		if res != nil {
+			json.NewEncoder(w).Encode(res)
+		}
 	})
 }
 

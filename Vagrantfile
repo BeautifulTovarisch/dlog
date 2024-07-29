@@ -19,7 +19,7 @@ Vagrant.configure("2") do |config|
   config.vm.provision "file", source: "~/.gitconfig", destination: ".gitconfig"
 
   config.vm.provision "tools", type: "shell", privileged: false, inline: <<-TOOLS
-    sudo dnf install -y git
+    sudo dnf install -y git tmux
   TOOLS
 
   config.vm.provision "go", type: "shell", privileged: false, inline: <<-GO

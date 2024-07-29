@@ -34,7 +34,7 @@ func read(log *Log, offset uint64) (Record, error) {
 	return log.records[offset], nil
 }
 
-func append(log *Log, record Record) (uint64, error) {
+func appendRecord(log *Log, record Record) (uint64, error) {
 	log.mu.Lock()
 	defer log.mu.Unlock()
 
@@ -61,8 +61,8 @@ func Read(offset uint64) (Record, error) {
 //	               ^
 //
 // This function operations on the global, package-level log.
-func (log *Log) Append(record Record) (uint64, error) {
-	return append(log, record)
+func Append(record Record) (uint64, error) {
+	return appendRecord(&globalLog, record)
 }
 
 // Read returns the record at [offset] or RecordNotFound if [offset] is out of
@@ -77,5 +77,5 @@ func (log *Log) Read(offset uint64) (Record, error) {
 //	[r1, r2, ... rn][new record]
 //	               ^
 func (log *Log) Append(record Record) (uint64, error) {
-	return append(log, record)
+	return appendRecord(log, record)
 }

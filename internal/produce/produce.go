@@ -4,12 +4,12 @@ package produce
 import (
 	"net/http"
 
-	"github.com/beautifultovarisch/distributed-project/internal/log"
+	"github.com/beautifultovarisch/dlog/internal/commitlog"
 )
 
 // Request contains a [Record] to be appended to the commit log.
 type Request struct {
-	Record log.Record `json:"record"`
+	Record commitlog.Record `json:"record"`
 }
 
 // Response contains the offset of a processed [Record] contained in a [Request]

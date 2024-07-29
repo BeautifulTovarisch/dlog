@@ -35,7 +35,8 @@ func Consume(req Request, w http.ResponseWriter, r *http.Request) (*Response, er
 
 	record, err := commitlog.Read(offset)
 	if err != nil {
-		if errors.Is(err, commitlog.RecordNotFound{}) {
+		var notFound commitlog.RecordNotFound
+		if errors.As(err, &notFound) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+
+	"github.com/linkedin/goavro"
 )
 
 // Allow users to provide input and output types to support more "go-like" HTTP
@@ -71,7 +73,44 @@ func shutdown() <-chan struct{} {
 	return conns
 }
 
-// Route associates the handler function [f] with requests that match [path]
+// Remove duplication between routes that support different encodings/APIs.
+func handleRequest[Req any, Res any](req Req, w http.ResponseWriter, r *http.Request, f Handler[Req, Res]) (*Res, error) {
+	// Allow these default headers to be overwritten by the handler
+	// TODO: Set some sensible default headers.
+	hdr := http.Header{}
+
+	rw := &responseWriter{
+		header: hdr,
+	}
+
+	// Perform the request.
+	res, err := f(req, rw, r)
+
+	// Copy headers and status to the ResponseWriter actually performing the I/O
+	maps.Copy(w.Header(), rw.Header())
+
+	if err != nil {
+		if rw.status != 0 {
+			w.WriteHeader(rw.status)
+		} else {
+			w.WriteHeader(http.StatusInternalServerError)
+		}
+
+		return res, err
+	}
+
+	// The call to Write() will automatically set the status to 200 if not set
+	// after this point.
+	if rw.status != 0 {
+		w.WriteHeader(rw.status)
+	}
+
+	// Return the response and error here so the serializer can deal with it.
+	return res, err
+}
+
+// Route associates the handler function [f] with requests that match [path].
+// Input and output data are serialized as JSON
 //
 // Example:
 //
@@ -94,37 +133,11 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 			}
 		}
 
-		// Allow these default headers to be overwritten by the handler
-		hdr := http.Header{
-			"Content-Type": []string{"application/json"},
-		}
-
-		rw := &responseWriter{
-			header: hdr,
-		}
-
-		// Perform the request.
-		res, err := f(req, rw, r)
-
-		// Copy headers and status to the ResponseWriter actually performing the I/O
-		maps.Copy(w.Header(), rw.Header())
-
+		res, err := handleRequest(req, w, r, f)
 		if err != nil {
-			if rw.status != 0 {
-				w.WriteHeader(rw.status)
-			} else {
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-
 			json.NewEncoder(w).Encode(err.Error())
 
 			return
-		}
-
-		// The call to Write() will automatically set the status to 200 if not set
-		// after this point.
-		if rw.status != 0 {
-			w.WriteHeader(rw.status)
 		}
 
 		// Provider ResponseWriter as a write stream and simply pipe [res] to the
@@ -132,6 +145,46 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 		if res != nil {
 			json.NewEncoder(w).Encode(res)
 		}
+	})
+}
+
+// RouteAvro associates the handler [f] with requests matching [path]. Inputs
+// are encoded and outputs decoded according to [in] and [out], otherwise this
+// function behaves exactly like [Route] with the important exception that the
+// input type must be an [interface{}].
+func RouteAvro[Req any, Res any](path string, in, out goavro.Codec, f Handler[interface{}, Res]) {
+	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+
+			return
+		}
+
+		req, _, err := in.NativeFromTextual(body)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+
+			return
+		}
+
+		res, err := handleRequest(req, w, r, f)
+		if err != nil {
+			// Do we encode the error as binary too?
+			// TODO: Figure out what to actually do here.
+			w.Write([]byte(err.Error()))
+
+			return
+		}
+
+		binary, err := out.BinaryFromNative(nil, res)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+
+			return
+		}
+
+		w.Write(binary)
 	})
 }
 

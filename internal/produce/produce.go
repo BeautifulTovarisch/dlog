@@ -19,5 +19,13 @@ type Response struct {
 
 // Produce accepts a [Request] containing a record and appends it to the commit
 // log. A [Response] containing the offset of the response is returned.
-func Produce(w http.ResponseWriter, r *http.Request) {
+func Produce(req Request, w http.ResponseWriter, r *http.Request) (*Response, error) {
+	offset, err := commitlog.Append(req.Record)
+	if err != nil {
+		return nil, err
+	}
+
+	res := Response{offset}
+
+	return &res, nil
 }

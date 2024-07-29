@@ -4,6 +4,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -51,20 +52,23 @@ func shutdown() <-chan struct{} {
 //
 // Example:
 //
-//	 type MyInput struct {}
-//	 type MyOutput struct {}
+//	type MyInput struct {}
+//	type MyOutput struct {}
 //
-//		Route("GET /", func(MyInput, r *http.Request)(*MyOutput, error) {
-//		  return MyOutput{}, nil
-//		})
+//	Route("GET /", func(MyInput, r *http.Request)(*MyOutput, error) {
+//	  return MyOutput{}, nil
+//	})
 func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		// Automagically deserialize the input type from the request body.
 		var req Req
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
+			// Ignore if the error is caused by an empty request body.
+			if err != io.EOF {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 
-			return
+				return
+			}
 		}
 
 		// Allow these default headers to be overwritten by the handler

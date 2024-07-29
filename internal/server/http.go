@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"maps"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,6 +15,28 @@ import (
 // handlers. This package implements a custom [ResponseWriter] to capture data
 // about the request.
 type Handler[Req any, Res any] func(Req, http.ResponseWriter, *http.Request) (*Res, error)
+
+// Basically exists to act like a spy and gather headers and the status code
+// while removing the ability to write to the client from the handler directly.
+type responseWriter struct {
+	header http.Header
+	status int
+}
+
+func (r *responseWriter) Header() http.Header {
+	return r.header
+}
+
+func (r *responseWriter) WriteHeader(status int) {
+	r.status = status
+}
+
+// Write is implemented as a no-op as the custom response writer only exists to
+// capture values from the HTTP handler. The actual writing is performed by the
+// [http.ResponseWriter] provided to [HandleFunc].
+func (r responseWriter) Write(b []byte) (int, error) {
+	return 0, nil
+}
 
 var (
 	mux *http.ServeMux
@@ -72,14 +95,36 @@ func Route[Req any, Res any](path string, f Handler[Req, Res]) {
 		}
 
 		// Allow these default headers to be overwritten by the handler
-		w.Header().Set("Content-Type", "application/json")
+		hdr := http.Header{
+			"Content-Type": []string{"application/json"},
+		}
 
-		// Perform the actual request.
-		res, err := f(req, w, r)
+		rw := &responseWriter{
+			header: hdr,
+		}
+
+		// Perform the request.
+		res, err := f(req, rw, r)
+
+		// Copy headers and status to the ResponseWriter actually performing the I/O
+		maps.Copy(w.Header(), rw.Header())
+
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			if rw.status != 0 {
+				w.WriteHeader(rw.status)
+			} else {
+				w.WriteHeader(http.StatusInternalServerError)
+			}
+
+			json.NewEncoder(w).Encode(err.Error())
 
 			return
+		}
+
+		// The call to Write() will automatically set the status to 200 if not set
+		// after this point.
+		if rw.status != 0 {
+			w.WriteHeader(rw.status)
 		}
 
 		// Provider ResponseWriter as a write stream and simply pipe [res] to the

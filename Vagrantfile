@@ -28,7 +28,7 @@ Vagrant.configure("2") do |config|
     sudo tar -C /usr/local -xvf go1.22.5.linux-amd64.tar.gz
 
     echo 'export PATH=$PATH:/usr/local/go/bin' >> /home/vagrant/.bashrc
-    echo 'export PATH=$PATH:$GOPATH' >> /home/vagrant/.bashrc
+    echo 'export PATH=$PATH:$(go env GOPATH)/bin' >> /home/vagrant/.bashrc
   GO
 
   config.vm.provision "staticcheck", type: "shell", privileged: false, inline: <<-CHECK

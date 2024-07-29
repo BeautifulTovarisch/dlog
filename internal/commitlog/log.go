@@ -2,7 +2,6 @@
 package commitlog
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -28,7 +27,7 @@ func read(log *Log, offset uint64) (Record, error) {
 	defer log.mu.Unlock()
 
 	if offset >= uint64(len(log.records)) {
-		return Record{}, fmt.Errorf("record not found at offset: %d", offset)
+		return Record{}, RecordNotFound{offset}
 	}
 
 	return log.records[offset], nil

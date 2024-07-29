@@ -3,6 +3,7 @@
 package consume
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -27,11 +28,17 @@ type Response struct {
 func Consume(req Request, w http.ResponseWriter, r *http.Request) (*Response, error) {
 	offset, err := strconv.ParseUint(r.PathValue("offset"), 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid offset: %v\n", offset)
+		return nil, fmt.Errorf("invalid offset: %v", offset)
 	}
+
+	w.Header().Set("x-trace-id", "123")
 
 	record, err := commitlog.Read(offset)
 	if err != nil {
+		if errors.Is(err, commitlog.RecordNotFound{}) {
+			w.WriteHeader(http.StatusNotFound)
+		}
+
 		return nil, err
 	}
 

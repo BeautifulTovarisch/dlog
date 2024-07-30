@@ -12,15 +12,15 @@ import (
 	"github.com/beautifultovarisch/dlog/internal/server"
 )
 
-// TODO: Play around with these types.
 type Req struct {
 	A string
 }
 
-type Res map[string]interface{}
+func handleAvro(req Req, w http.ResponseWriter, r *http.Request) (*map[string]interface{}, error) {
+	res := make(map[string]interface{})
 
-func handleAvro(req Req, w http.ResponseWriter, r *http.Request) (*Res, error) {
-  res := make(Res)
+  res["offset"] = 1
+  res["value"] = []byte{}
 
 	return &res, nil
 }
@@ -35,7 +35,7 @@ func main() {
 	server.Route("POST /produce", produce.Produce)
 
 	// No need to decode incoming input.
-	server.RouteAvro[Req, Res]("GET /avro", nil, codec, handleAvro)
+	server.RouteAvro("GET /avro", nil, codec, handleAvro)
 
 	server.Run()
 }

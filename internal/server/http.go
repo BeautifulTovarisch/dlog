@@ -3,14 +3,10 @@ package server
 
 import (
 	"context"
-	"encoding/json"
-	"io"
 	"maps"
 	"net/http"
 	"os"
 	"os/signal"
-
-	"github.com/linkedin/goavro"
 )
 
 // Allow users to provide input and output types to support more "go-like" HTTP
@@ -53,26 +49,6 @@ func init() {
 	}
 }
 
-// Create a goroutine to listen of SIGINT, SIGTERM, etc... and allow the caller
-// to block until gracefully shut down.
-func shutdown() <-chan struct{} {
-	// Channel to block until idle connections are closed.
-	conns := make(chan struct{})
-	defer close(conns)
-
-	// This goroutine blocks until receiving SIGINT
-	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
-
-		<-sigint
-
-		Shutdown()
-	}()
-
-	return conns
-}
-
 // Remove duplication between routes that support different encodings/APIs.
 func handleRequest[Req any, Res any](req Req, w http.ResponseWriter, r *http.Request, f Handler[Req, Res]) (*Res, error) {
 	// Allow these default headers to be overwritten by the handler
@@ -109,102 +85,24 @@ func handleRequest[Req any, Res any](req Req, w http.ResponseWriter, r *http.Req
 	return res, err
 }
 
-// Route associates the handler function [f] with requests that match [path].
-// Input and output data are serialized as JSON
-//
-// Example:
-//
-//	type MyInput struct {}
-//	type MyOutput struct {}
-//
-//	Route("GET /", func(MyInput, r *http.Request)(*MyOutput, error) {
-//	  return MyOutput{}, nil
-//	})
-func Route[Req any, Res any](path string, f Handler[Req, Res]) {
-	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		// Automagically deserialize the input type from the request body.
-		var req Req
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			// Ignore if the error is caused by an empty request body.
-			if err != io.EOF {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+// Create a goroutine to listen of SIGINT, SIGTERM, etc... and allow the caller
+// to block until gracefully shut down.
+func shutdown() <-chan struct{} {
+	// Channel to block until idle connections are closed.
+	conns := make(chan struct{})
+	defer close(conns)
 
-				return
-			}
-		}
+	// This goroutine blocks until receiving SIGINT
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt)
 
-		res, err := handleRequest(req, w, r, f)
-		if err != nil {
-			json.NewEncoder(w).Encode(err.Error())
+		<-sigint
 
-			return
-		}
+		Shutdown()
+	}()
 
-		// Provider ResponseWriter as a write stream and simply pipe [res] to the
-		// client.
-		if res != nil {
-			json.NewEncoder(w).Encode(res)
-		}
-	})
-}
-
-// RouteAvro associates the handler [f] with requests matching [path]. Inputs
-// are encoded and outputs decoded according to [in] and [out], otherwise this
-// function behaves exactly like [Route] with the important exception that the
-// input type must be an [interface{}].
-//
-// If [in] or [out] are nil, the corresponding operation for that codec is not
-// performed.
-func RouteAvro[Req any, Res any](path string, in, out *goavro.Codec, f Handler[Req, Res]) {
-	mux.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-
-			return
-		}
-
-		var req Req
-		// Optionally decode the input into the specified type.
-		if in != nil {
-			native, _, err := in.NativeFromTextual(body)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
-
-				return
-			}
-
-			if v, ok := native.(Req); ok {
-				req = v
-			}
-		}
-
-		res, err := handleRequest(req, w, r, f)
-		if err != nil {
-			// Do we encode the error as binary too?
-			// TODO: Figure out what to actually do here.
-			w.Write([]byte(err.Error()))
-
-			return
-		}
-
-		// Optionally decode the output
-		if out != nil {
-			binary, err := out.BinaryFromNative(nil, res)
-			if err != nil {
-				w.Write([]byte(err.Error()))
-
-				return
-			}
-
-			w.Write(binary)
-
-			return
-		}
-
-		// Write nothing to the client.
-		w.Write([]byte{})
-	})
+	return conns
 }
 
 // Shutdown attempts a graceful shutdown of the HTTP server, panicking on error

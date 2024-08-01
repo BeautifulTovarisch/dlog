@@ -12,7 +12,7 @@ func TestStore(t *testing.T) {
 	run := func(name string, fn func(*Store, *testing.T)) {
 		tmp, err := os.CreateTemp("", "test_store")
 		if err != nil {
-			t.Fatalf("error creating temporary file: %v", err)
+			t.Fatal(err)
 		}
 
 		store, err := New(tmp)
@@ -96,6 +96,48 @@ func TestStore(t *testing.T) {
 			if actual := string(record); str != actual {
 				t.Errorf("expected record to contain %s. Got: %v", str, actual)
 			}
+		}
+	})
+
+	// "Recovery" in this sense is the ability to 'recreate' a store destroyed by
+	// some failure.
+	t.Run("Recovery", func(t *testing.T) {
+		msg := "canary"
+		data := []byte(msg)
+
+		tmp, err := os.CreateTemp("", "test_recover")
+
+		// Create a store and append like normal.
+		store, err := New(tmp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		_, pos, err := store.Append(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// NOTE: A store 'naturally' flushes on Read, meaning appends without a
+		// corresponding read or manual buffer flush will appear to be incorrect!
+		if err := store.buf.Flush(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Create a new store pointing to the same file on disk. This represents an
+		// attempt at recovery.
+		store, err = New(tmp)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		record, err := store.Read(pos)
+		if err != nil {
+			t.Errorf("error reading from recovery store: %v", err)
+		}
+
+		if !bytes.Equal(record, data) {
+			t.Errorf("expected %s from recovery store. Got %s", data, record)
 		}
 	})
 }

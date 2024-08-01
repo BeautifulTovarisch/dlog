@@ -19,8 +19,8 @@ type Req struct {
 func handleAvro(req Req, w http.ResponseWriter, r *http.Request) (*map[string]interface{}, error) {
 	res := make(map[string]interface{})
 
-  res["offset"] = 1
-  res["value"] = []byte{}
+	res["offset"] = 1
+	res["value"] = []byte{}
 
 	return &res, nil
 }

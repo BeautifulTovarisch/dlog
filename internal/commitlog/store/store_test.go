@@ -106,6 +106,9 @@ func TestStore(t *testing.T) {
 		data := []byte(msg)
 
 		tmp, err := os.CreateTemp("", "test_recover")
+		if err != nil {
+			t.Fatal(err)
+		}
 
 		// Create a store and append like normal.
 		store, err := New(tmp)

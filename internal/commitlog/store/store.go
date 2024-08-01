@@ -54,8 +54,8 @@ func (s *Store) Append(p []byte) (uint64, uint64, error) {
 	// The current size of the store is the position of the new record
 	pos := s.size
 
-	// Write the length of the record to the buffer first. This is always 8 bytes
-	// hence the value of lenWidth
+	// Write the length of the record to the buffer first. This metadata is always
+	// [lenWidth] bytes in length.
 	if err := binary.Write(s.buf, enc, uint64(len(p))); err != nil {
 		return 0, 0, err
 	}

@@ -5,26 +5,30 @@ import (
 	"testing"
 )
 
-// Write bytes to a temporary file and assert that
 func TestStoreAppend(t *testing.T) {
-	tmp, err := os.CreateTemp("", "test_store")
-	if err != nil {
-		t.Fatalf("error creating temporary file: %v", err)
-	}
+	// TODO: Find a way to remove duplicative 'run' helpers between test suites.
+	run := func(name string, fn func(*Store, *testing.T)) {
+		tmp, err := os.CreateTemp("", "test_store_append")
+		if err != nil {
+			t.Fatalf("error creating temporary file: %v", err)
+		}
 
-	t.Cleanup(func() {
-		os.Remove(tmp.Name())
-	})
-
-	t.Run("Empty", func(t *testing.T) {
-		// appending an empty byte slice is a no-op
 		store, err := New(tmp)
 		if err != nil {
 			t.Fatalf("error creating store: %v", err)
 		}
 
-		defer store.Close()
+		t.Cleanup(func() {
+			store.Close()
+			os.Remove(tmp.Name())
+		})
 
+		fn(store, t)
+	}
+
+	run("Empty", func(store *Store, t *testing.T) {
+		// appending an empty byte slice is NOT a no-op. The header containing the
+		// length is still written even if the length is 0.
 		n, pos, err := store.Append([]byte{})
 		if err != nil {
 			t.Fatalf("error appending bytes: %v", err)
@@ -40,14 +44,9 @@ func TestStoreAppend(t *testing.T) {
 		}
 	})
 
-	t.Run("Write fixed", func(t *testing.T) {
+	run("Write fixed", func(store *Store, t *testing.T) {
 		data := []byte("my data")
 		n := uint64(len(data))
-
-		store, err := New(tmp)
-		if err != nil {
-			t.Fatalf("error creating store: %v", err)
-		}
 
 		// Record the original size of the store.
 		size := store.size
@@ -61,16 +60,16 @@ func TestStoreAppend(t *testing.T) {
 			t.Errorf("expected record length of %d. Got: %d", n+lenWidth, length)
 		}
 
-		if pos != lenWidth {
+		if pos != 0 {
 			t.Errorf("expected position of record to be %d. Got: %d", lenWidth, pos)
 		}
 
-		if store.size != size+n+lenWidth {
+		if store.size != size+length {
 			t.Errorf("expected store size of %d. Got: %d", store.size, n+lenWidth)
 		}
 	})
 
-	t.Run("Write variable", func(t *testing.T) {
+	run("Write variable", func(store *Store, t *testing.T) {
 		data := [][]byte{
 			[]byte("aaaa"),
 			[]byte("bbbb"),
@@ -79,13 +78,8 @@ func TestStoreAppend(t *testing.T) {
 			[]byte("goodnight, moon"),
 		}
 
-		store, err := New(tmp)
-		if err != nil {
-			t.Fatalf("error creating store: %v", err)
-		}
-
 		// Keep track of the previous position
-		var prevPos, prevLen uint64 = 8, 0
+		var prevPos, prevLen uint64 = 0, 0
 		for _, d := range data {
 			length, pos, err := store.Append(d)
 			if err != nil {
@@ -108,4 +102,10 @@ func TestStoreAppend(t *testing.T) {
 			prevPos, prevLen = pos, length
 		}
 	})
+}
+
+// This test suite is interesting in that it uses Append in order to set up the
+// test file for Read operations. The jury is still out on whether this is poor
+// test design or not.
+func TestRead(t *testing.T) {
 }

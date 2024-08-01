@@ -1,14 +1,16 @@
 package store
 
 import (
+	"bytes"
+	"io"
 	"os"
 	"testing"
 )
 
-func TestStoreAppend(t *testing.T) {
+func TestStore(t *testing.T) {
 	// TODO: Find a way to remove duplicative 'run' helpers between test suites.
 	run := func(name string, fn func(*Store, *testing.T)) {
-		tmp, err := os.CreateTemp("", "test_store_append")
+		tmp, err := os.CreateTemp("", "test_store")
 		if err != nil {
 			t.Fatalf("error creating temporary file: %v", err)
 		}
@@ -26,51 +28,9 @@ func TestStoreAppend(t *testing.T) {
 		fn(store, t)
 	}
 
-	run("Empty", func(store *Store, t *testing.T) {
-		// appending an empty byte slice is NOT a no-op. The header containing the
-		// length is still written even if the length is 0.
-		n, pos, err := store.Append([]byte{})
-		if err != nil {
-			t.Fatalf("error appending bytes: %v", err)
-		}
-
-		// 8 is needed to store the length of the record.
-		if n != 8 {
-			t.Errorf("expected 8 bytes written. Got: %d", n)
-		}
-
-		if pos > 0 {
-			t.Errorf("expected position to be 0. Got: %d", pos)
-		}
-	})
-
-	run("Write fixed", func(store *Store, t *testing.T) {
-		data := []byte("my data")
-		n := uint64(len(data))
-
-		// Record the original size of the store.
-		size := store.size
-
-		length, pos, err := store.Append(data)
-		if err != nil {
-			t.Fatalf("error appending record: %v", err)
-		}
-
-		if length != n+lenWidth {
-			t.Errorf("expected record length of %d. Got: %d", n+lenWidth, length)
-		}
-
-		if pos != 0 {
-			t.Errorf("expected position of record to be %d. Got: %d", lenWidth, pos)
-		}
-
-		if store.size != size+length {
-			t.Errorf("expected store size of %d. Got: %d", store.size, n+lenWidth)
-		}
-	})
-
-	run("Write variable", func(store *Store, t *testing.T) {
+	run("Append", func(store *Store, t *testing.T) {
 		data := [][]byte{
+			[]byte{},
 			[]byte("aaaa"),
 			[]byte("bbbb"),
 			[]byte("cccc"),
@@ -102,10 +62,40 @@ func TestStoreAppend(t *testing.T) {
 			prevPos, prevLen = pos, length
 		}
 	})
-}
 
-// This test suite is interesting in that it uses Append in order to set up the
-// test file for Read operations. The jury is still out on whether this is poor
-// test design or not.
-func TestRead(t *testing.T) {
+	// This test suite is interesting in that it uses Append in order to set up the
+	// test file for Read operations. The jury is still out on whether this is poor
+	// test design or not.
+	run("Read", func(store *Store, t *testing.T) {
+		tests := map[string][]byte{
+			"":       []byte{},
+			"first":  []byte("first"),
+			"second": []byte("second"),
+		}
+
+		// Read back the records as we write them for a quick sanity check.
+		for str, slice := range tests {
+			_, pos, err := store.Append(slice)
+			if err != nil {
+				t.Errorf("error appending record: %v", err)
+			}
+
+			record, err := store.Read(pos)
+			if err != nil && err != io.EOF {
+				t.Errorf("error reading record: %v", err)
+			}
+
+			// This is evidently more efficient than the stanard for range loop since
+			// string(a) == string(b) does not perform allocations.
+			//
+			// TODO: Dig into the details here for educational purposes.
+			if !bytes.Equal(slice, record) {
+				t.Errorf("expected record to equal %v. Got: %v", slice, record)
+			}
+
+			if actual := string(record); str != actual {
+				t.Errorf("expected record to contain %s. Got: %v", str, actual)
+			}
+		}
+	})
 }

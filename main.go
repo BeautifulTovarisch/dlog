@@ -6,10 +6,11 @@ package main
 import (
 	"net/http"
 
-	"github.com/beautifultovarisch/dlog/internal/consume"
-	"github.com/beautifultovarisch/dlog/internal/produce"
 	"github.com/beautifultovarisch/dlog/internal/schema"
 	"github.com/beautifultovarisch/dlog/internal/server"
+
+	"github.com/beautifultovarisch/dlog/internal/api/consume"
+	"github.com/beautifultovarisch/dlog/internal/api/produce"
 )
 
 type Req struct {

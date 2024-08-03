@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-var EmptyFile = errors.New("index cannot be backed by empty file")
+var ErrEmptyFile = errors.New("index cannot be backed by empty file")
 
 // Index encapulates the association between records and their offset on disk.
 type Index struct {
@@ -34,7 +34,7 @@ func New(f *os.File, maxBytes uint64) (*Index, error) {
 
 	size := stat.Size()
 	if size == 0 {
-		return nil, EmptyFile
+		return nil, ErrEmptyFile
 	}
 
 	// Map [f] as a shared region. This serves as the storage for the index.

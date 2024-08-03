@@ -31,7 +31,7 @@ func TestIndex(t *testing.T) {
 			})
 
 			i, err := New(tmp, 0)
-			if err != EmptyFile {
+			if err != ErrEmptyFile {
 				t.Errorf("expected New() to return EmptyFile given empty file")
 			}
 

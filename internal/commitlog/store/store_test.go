@@ -8,24 +8,25 @@ import (
 )
 
 func TestStore(t *testing.T) {
-	// TODO: Find a way to remove duplicative 'run' helpers between test suites.
 	run := func(name string, fn func(*Store, *testing.T)) {
-		tmp, err := os.CreateTemp("", "test_store")
-		if err != nil {
-			t.Fatal(err)
-		}
+		t.Run(name, func(t *testing.T) {
+			tmp, err := os.CreateTemp("", "test_store")
+			if err != nil {
+				t.Fatal(err)
+			}
 
-		store, err := New(tmp)
-		if err != nil {
-			t.Fatalf("error creating store: %v", err)
-		}
+			store, err := New(tmp)
+			if err != nil {
+				t.Fatalf("error creating store: %v", err)
+			}
 
-		t.Cleanup(func() {
-			store.Close()
-			os.Remove(tmp.Name())
+			t.Cleanup(func() {
+				store.Close()
+				os.Remove(tmp.Name())
+			})
+
+			fn(store, t)
 		})
-
-		fn(store, t)
 	}
 
 	run("Append", func(store *Store, t *testing.T) {

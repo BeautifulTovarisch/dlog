@@ -1,5 +1,7 @@
-// package commitlog implements a commit log
-package commitlog
+// package proto implements a prototype commit log backed with a simple byte
+// slice. This package is intended to serve as a stand-in for development of
+// the API until integrating with the persistent commit log.
+package proto
 
 import (
 	"sync"

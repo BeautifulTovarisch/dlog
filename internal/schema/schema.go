@@ -1,25 +1,55 @@
-// package schema provides mechanisms to encode and decode avros schemas. Avro
-// schemas are located under directories corresponding to the package defining
-// the data type (e.g internal/commitlog <=> schemas/commitlog)
+// package schema provides avro codecs for schemas located under the package's
+// directory structure. Each codec corresponds to a constant defined in the
+// package. Codecs are lazily and idempotently initialized.
 package schema
 
 import (
-	"os"
+	_ "embed"
+
+	"fmt"
 
 	"github.com/linkedin/goavro"
 )
 
-// Provide paths to schemas for convenience and future-proofing.
+// CODEC corresponds to a codec for a particular schema.
+type CODEC uint8
+
 const (
-	COMMIT_LOG_RECORD = "./internal/schema/commitlog/record.json"
+	RECORD CODEC = iota
 )
 
-// MakeCodec accepts a path to an avro schema and produces a [goavro.Codec].
-func MakeCodec(path string) (*goavro.Codec, error) {
-	data, err := os.ReadFile(path)
+var (
+	//go:embed commitlog/record.json
+	record string
+
+	// Lookup associates a constant value representing a schema with the correct
+	// avro codec.
+	Lookup map[CODEC]*goavro.Codec
+)
+
+func getCodec(c CODEC, schema string) (*goavro.Codec, error) {
+	codec, ok := Lookup[c]
+	if ok {
+		return codec, nil
+	}
+
+	codec, err := goavro.NewCodec(schema)
 	if err != nil {
 		return nil, err
 	}
 
-	return goavro.NewCodec(string(data))
+	return codec, nil
+}
+
+// GetCodec retrieves the codec specified by [c]. The codec will be initialized
+// only on the first call to GetCodec; subsequent invocations are idempotent.
+func GetCodec(c CODEC) (*goavro.Codec, error) {
+	switch c {
+	case RECORD:
+		return getCodec(c, record)
+	default:
+		return nil, fmt.Errorf("Codec not found")
+	}
+
+	return nil, fmt.Errorf("unreachable")
 }

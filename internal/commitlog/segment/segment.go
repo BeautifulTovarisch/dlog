@@ -87,10 +87,34 @@ func (s *Segment) Append(record *proto.Record) (uint64, error) {
 	record.Offset = cur
 
 	// Encode the record into binary and persist to the store.
-	_, err := schema.GetCodec(schema.RECORD)
+	c, err := schema.GetCodec(schema.RECORD)
 	if err != nil {
 		return 0, err
 	}
+
+	// Avro requires this type.
+	r := map[string]interface{}{
+		"value":  record.Value,
+		"offset": int32(record.Offset),
+	}
+
+	data, err := c.BinaryFromNative(nil, r)
+	if err != nil {
+		return 0, err
+	}
+
+	_, pos, err := s.Store.Append(data)
+	if err != nil {
+		return 0, err
+	}
+
+	// TODO: I need a picture describing the relationship of these offsets.
+	off := uint32(s.nextOffset - uint64(s.baseOffset))
+	if err := s.Index.Write(off, pos); err != nil {
+		return 0, err
+	}
+
+	s.nextOffset++
 
 	return cur, nil
 }

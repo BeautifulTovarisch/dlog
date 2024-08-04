@@ -89,7 +89,7 @@ func (i *Index) Close() error {
 }
 
 // Read accepts an offset and computes the corresponding record's position in
-// the store. Providing [in=-1] will append the record to the end of the index.
+// the store. Providing [in=-1] will read the record from the end of the index.
 //
 // NOTE: Unlike indexing into Python lists, values other than -1 will return an
 // error rather than correspond to the [n+i]th element.

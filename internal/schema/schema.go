@@ -24,7 +24,7 @@ var (
 
 	// Lookup associates a constant value representing a schema with the correct
 	// avro codec.
-	Lookup map[CODEC]*goavro.Codec
+	Lookup = make(map[CODEC]*goavro.Codec)
 )
 
 func getCodec(c CODEC, schema string) (*goavro.Codec, error) {
@@ -38,6 +38,9 @@ func getCodec(c CODEC, schema string) (*goavro.Codec, error) {
 		return nil, err
 	}
 
+	// Store the codec for future lookups
+	Lookup[c] = codec
+
 	return codec, nil
 }
 
@@ -48,8 +51,6 @@ func GetCodec(c CODEC) (*goavro.Codec, error) {
 	case RECORD:
 		return getCodec(c, record)
 	default:
-		return nil, fmt.Errorf("Codec not found")
+		return nil, fmt.Errorf("codec not found")
 	}
-
-	return nil, fmt.Errorf("unreachable")
 }

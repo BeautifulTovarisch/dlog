@@ -27,8 +27,8 @@ type Config struct {
 // Segment encapsulates operations on a [Store] and [Index], ensuring the
 // entries in both correspond.
 type Segment struct {
-	*store.Store
-	*index.Index
+	store *store.Store
+	index *index.Index
 	Config
 	baseOffset, nextOffset uint64
 }
@@ -57,11 +57,11 @@ func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
 		return nil, err
 	}
 
-	if s.Store, err = store.New(storefile); err != nil {
+	if s.store, err = store.New(storefile); err != nil {
 		return nil, err
 	}
 
-	if s.Index, err = index.New(indexfile, c.MaxBytes); err != nil {
+	if s.index, err = index.New(indexfile, c.MaxBytes); err != nil {
 		return nil, err
 	}
 
@@ -72,7 +72,7 @@ func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
 	//  [ ... | ... ]
 	//  ^      ^
 	//  base   base+off+1
-	if off, _, err := s.Index.Read(-1); err != nil {
+	if off, _, err := s.index.Read(-1); err != nil {
 		s.nextOffset = baseOffset
 	} else {
 		s.nextOffset = baseOffset + uint64(off) + 1
@@ -103,14 +103,15 @@ func (s *Segment) Append(record *proto.Record) (uint64, error) {
 		return 0, err
 	}
 
-	_, pos, err := s.Store.Append(data)
+	_, pos, err := s.store.Append(data)
 	if err != nil {
 		return 0, err
 	}
 
 	// TODO: I need a picture describing the relationship of these offsets.
+	// Add a nice diagram to the README later.
 	off := uint32(s.nextOffset - uint64(s.baseOffset))
-	if err := s.Index.Write(off, pos); err != nil {
+	if err := s.index.Write(off, pos); err != nil {
 		return 0, err
 	}
 
@@ -119,12 +120,56 @@ func (s *Segment) Append(record *proto.Record) (uint64, error) {
 	return cur, nil
 }
 
+// Read retrieves the record in its store located at offset [off].
+func (s *Segment) Read(off uint64) (*proto.Record, error) {
+	c, err := schema.GetCodec(schema.RECORD)
+	if err != nil {
+		return nil, err
+	}
+
+	_, pos, err := s.index.Read(int64(off))
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := s.store.Read(pos)
+	if err != nil {
+		return nil, err
+	}
+
+	rec, _, err := c.NativeFromBinary(data)
+	if err != nil {
+		return nil, err
+	}
+
+	// I don't actually know if this assertion will ever fail.
+	if m, ok := rec.(map[string]interface{}); ok {
+		value, ok := m["value"]
+		if !ok {
+			return nil, fmt.Errorf("unable to retrieve 'value' from record")
+		}
+
+		offset, ok := m["offset"]
+		if !ok {
+			return nil, fmt.Errorf("unable to retrieve 'offset' from record")
+		}
+
+		// Let it panic. See if I care...
+		return &proto.Record{
+			Offset: uint64(offset.(int64)),
+			Value:  value.([]byte),
+		}, nil
+	} else {
+		return nil, fmt.Errorf("invalid type. %v is not a map", rec)
+	}
+}
+
 func (s *Segment) Close() error {
-	if err := s.Index.Close(); err != nil {
+	if err := s.index.Close(); err != nil {
 		return err
 	}
 
-	if err := s.Store.Close(); err != nil {
+	if err := s.store.Close(); err != nil {
 		return err
 	}
 

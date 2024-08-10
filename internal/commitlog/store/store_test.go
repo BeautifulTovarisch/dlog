@@ -117,6 +117,11 @@ func TestStore(t *testing.T) {
 			t.Fatal(err)
 		}
 
+		t.Cleanup(func() {
+			os.Remove(tmp.Name())
+			store.Close()
+		})
+
 		_, pos, err := store.Append(data)
 		if err != nil {
 			t.Fatal(err)

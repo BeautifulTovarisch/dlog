@@ -28,6 +28,8 @@ func TestSegment(t *testing.T) {
 
 			t.Cleanup(func() {
 				seg.Close()
+				os.Remove(seg.index.File.Name())
+				os.Remove(seg.store.File.Name())
 			})
 
 			fn(seg, t)
@@ -44,19 +46,19 @@ func TestSegment(t *testing.T) {
 			t.Errorf("expected baseoffset=%d. Got: %d", 0, actual)
 		}
 
-		if seg.Store == nil {
+		if seg.store == nil {
 			t.Error("failed to initialize store")
 		}
 
-		if seg.Index == nil {
+		if seg.index == nil {
 			t.Error("failed to initialize index")
 		}
 
 		t.Cleanup(func() {
 			seg.Close()
 
-			os.Remove(seg.Index.File.Name())
-			os.Remove(seg.Store.File.Name())
+			os.Remove(seg.index.File.Name())
+			os.Remove(seg.store.File.Name())
 		})
 	})
 
@@ -69,7 +71,7 @@ func TestSegment(t *testing.T) {
 		msg := []byte("the record")
 
 		record := proto.Record{
-			Value: []byte("the record"),
+			Value: msg,
 		}
 
 		off, err := s.Append(&record)
@@ -84,8 +86,8 @@ func TestSegment(t *testing.T) {
 
 		// Read the index to retrieve the position in the store. Deserialize and
 		// ensure the original record's data matches.
-		pos, _, _ := s.Index.Read(-1)
-		data, _ := s.Store.Read(uint64(pos))
+		pos, _, _ := s.index.Read(-1)
+		data, _ := s.store.Read(uint64(pos))
 
 		rec, _, err := c.NativeFromBinary(data)
 		if err != nil {
@@ -100,9 +102,31 @@ func TestSegment(t *testing.T) {
 				t.Errorf("record missing value field")
 			}
 
+			// A hack since directly converting to string does not work.
 			if actual := fmt.Sprintf("%s", value); string(msg) != actual {
 				t.Errorf("expected: %s. Got: %s", msg, actual)
 			}
+		}
+	})
+
+	run("Read", func(s *Segment, t *testing.T) {
+		msg := []byte("hello, world!")
+		record := proto.Record{
+			Value: msg,
+		}
+
+		off, err := s.Append(&record)
+		if err != nil {
+			t.Fatalf("error appending record: %v", err)
+		}
+
+		rec, err := s.Read(off)
+		if err != nil {
+			t.Errorf("error reading segment: %v", err)
+		}
+
+		if actual := rec.Value; string(actual) != string(msg) {
+			t.Errorf("invalid data from store. Expected: %s. Got: %s", actual, msg)
 		}
 	})
 }

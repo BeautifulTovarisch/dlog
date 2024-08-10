@@ -21,7 +21,7 @@ const (
 // Config governs the parameters of the [Segment], [Store], and [Index]
 // TODO: Determine whether this is the right place for this.
 type Config struct {
-	MaxBytes uint64
+	MaxStoreBytes, MaxIndexBytes uint64
 }
 
 // Segment encapsulates operations on a [Store] and [Index], ensuring the
@@ -61,7 +61,7 @@ func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
 		return nil, err
 	}
 
-	if s.index, err = index.New(indexfile, c.MaxBytes); err != nil {
+	if s.index, err = index.New(indexfile, c.MaxIndexBytes); err != nil {
 		return nil, err
 	}
 
@@ -127,7 +127,8 @@ func (s *Segment) Read(off uint64) (*proto.Record, error) {
 		return nil, err
 	}
 
-	_, pos, err := s.index.Read(int64(off))
+	// Essentially perform the inverse operations of [Append]
+	_, pos, err := s.index.Read(int64(off - s.baseOffset))
 	if err != nil {
 		return nil, err
 	}

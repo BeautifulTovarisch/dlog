@@ -21,7 +21,7 @@ var (
 func TestSegment(t *testing.T) {
 	run := func(name string, fn func(s *Segment, t *testing.T)) {
 		t.Run(name, func(t *testing.T) {
-			seg, err := New(tmpDir, 0, Config{maxBytes})
+			seg, err := New(tmpDir, 0, Config{MaxIndexBytes: maxBytes})
 			if err != nil {
 				t.Fatalf("error creating segment: %v", err)
 			}
@@ -37,7 +37,7 @@ func TestSegment(t *testing.T) {
 	}
 
 	t.Run("New", func(t *testing.T) {
-		seg, err := New(tmpDir, 0, Config{maxBytes})
+		seg, err := New(tmpDir, 0, Config{MaxIndexBytes: maxBytes})
 		if err != nil {
 			t.Errorf("error creating segment: %v", err)
 		}

@@ -11,7 +11,8 @@ import (
 )
 
 const (
-	maxBytes = (1 << 10)
+	maxBytes    = (1 << 10)
+	recordWidth = 12
 )
 
 var (
@@ -21,15 +22,18 @@ var (
 func TestSegment(t *testing.T) {
 	run := func(name string, fn func(s *Segment, t *testing.T)) {
 		t.Run(name, func(t *testing.T) {
-			seg, err := New(tmpDir, 0, Config{MaxIndexBytes: maxBytes})
+			seg, err := New(tmpDir, 0, Config{
+				MaxStoreBytes: maxBytes,
+				// 3 records.
+				MaxIndexBytes: recordWidth * 3,
+			})
+
 			if err != nil {
 				t.Fatalf("error creating segment: %v", err)
 			}
 
 			t.Cleanup(func() {
-				seg.Close()
-				os.Remove(seg.index.File.Name())
-				os.Remove(seg.store.File.Name())
+				seg.Remove()
 			})
 
 			fn(seg, t)
@@ -55,10 +59,7 @@ func TestSegment(t *testing.T) {
 		}
 
 		t.Cleanup(func() {
-			seg.Close()
-
-			os.Remove(seg.index.File.Name())
-			os.Remove(seg.store.File.Name())
+			seg.Remove()
 		})
 	})
 
@@ -127,6 +128,24 @@ func TestSegment(t *testing.T) {
 
 		if actual := rec.Value; string(actual) != string(msg) {
 			t.Errorf("invalid data from store. Expected: %s. Got: %s", actual, msg)
+		}
+	})
+
+	run("Full", func(s *Segment, t *testing.T) {
+		// Insert three records and ensure the segment is full.
+		for i := 0; i < 3; i++ {
+			off, err := s.Append(&proto.Record{})
+			if err != nil {
+				t.Errorf("error appending record: %d", i)
+			}
+
+			if off != uint64(i) {
+				t.Errorf("expected offset of %d. Got: %d", i, off)
+			}
+		}
+
+		if !s.IsFull() {
+			t.Errorf("Expected segment to be full. size (index=%d, store=%d)", s.index.Size(), s.store.Size())
 		}
 	})
 }

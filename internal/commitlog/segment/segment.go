@@ -33,6 +33,10 @@ type Segment struct {
 	baseOffset, nextOffset uint64
 }
 
+// func nearestMultiple(j, k uint64) uint64 {
+// 	return (j / k) * k
+// }
+
 // New constructs a segment, initializing the encapsulated store and index and
 // creating their respective backing files.
 func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
@@ -165,12 +169,41 @@ func (s *Segment) Read(off uint64) (*proto.Record, error) {
 	}
 }
 
+// IsFull returns whether the segment is currently full, that is, either its
+// store or index is at capacity. This is used by clients to determine whether
+// a new segment should be created.
+func (s *Segment) IsFull() bool {
+	return s.index.Size() >= s.Config.MaxIndexBytes ||
+		s.store.Size() >= s.Config.MaxStoreBytes
+}
+
+// Close invokes the respective Close operations on the store and index. This
+// flushes any data in-memory or in a buffer to disk and truncates the backing
+// files to their corresponding sizes.
 func (s *Segment) Close() error {
 	if err := s.index.Close(); err != nil {
 		return err
 	}
 
 	if err := s.store.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Remove closes the segment and deletes the files backing the index and store
+// from disk.
+func (s *Segment) Remove() error {
+	if err := s.Close(); err != nil {
+		return err
+	}
+
+	if err := os.Remove(s.index.Name()); err != nil {
+		return err
+	}
+
+	if err := os.Remove(s.store.Name()); err != nil {
 		return err
 	}
 

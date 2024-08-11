@@ -124,3 +124,8 @@ func (s *Store) Close() error {
 
 	return s.File.Close()
 }
+
+// Size returns the size of the store in bytes.
+func (s *Store) Size() uint64 {
+	return s.size
+}

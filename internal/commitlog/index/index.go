@@ -137,3 +137,8 @@ func (i *Index) Write(off uint32, pos uint64) error {
 func (i *Index) Name() string {
 	return i.File.Name()
 }
+
+// Size returns the current size of the index in bytes.
+func (i *Index) Size() uint64 {
+	return i.size
+}

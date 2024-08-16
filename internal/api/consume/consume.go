@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/beautifultovarisch/dlog/internal/commitlog/proto"
+	"github.com/beautifultovarisch/dlog/internal/commitlog/record"
 )
 
 // Request contains information for requesting a particular record based on an
@@ -19,7 +19,7 @@ type Request struct {
 
 // Response is a record corresponding to an offset
 type Response struct {
-	Record proto.Record `json:"record"`
+	Record record.Record `json:"record"`
 }
 
 // GET /consume/{offset}
@@ -33,9 +33,9 @@ func Consume(req Request, w http.ResponseWriter, r *http.Request) (*Response, er
 
 	w.Header().Set("x-trace-id", "123")
 
-	record, err := proto.Read(offset)
+	rec, err := record.Read(offset)
 	if err != nil {
-		var notFound proto.RecordNotFound
+		var notFound record.RecordNotFound
 		if errors.As(err, &notFound) {
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -43,7 +43,7 @@ func Consume(req Request, w http.ResponseWriter, r *http.Request) (*Response, er
 		return nil, err
 	}
 
-	res := Response{record}
+	res := Response{rec}
 
 	return &res, nil
 }

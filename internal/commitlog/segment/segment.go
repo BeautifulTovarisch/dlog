@@ -9,7 +9,7 @@ import (
 	"github.com/beautifultovarisch/dlog/internal/schema"
 
 	"github.com/beautifultovarisch/dlog/internal/commitlog/index"
-	"github.com/beautifultovarisch/dlog/internal/commitlog/proto"
+	"github.com/beautifultovarisch/dlog/internal/commitlog/record"
 	"github.com/beautifultovarisch/dlog/internal/commitlog/store"
 )
 
@@ -21,6 +21,7 @@ const (
 // Config governs the parameters of the [Segment], [Store], and [Index]
 // TODO: Determine whether this is the right place for this.
 type Config struct {
+	InitialOffset                uint64 // InitialOffset is the initial offset of the segment
 	MaxStoreBytes, MaxIndexBytes uint64
 }
 
@@ -30,7 +31,7 @@ type Segment struct {
 	store *store.Store
 	index *index.Index
 	Config
-	baseOffset, nextOffset uint64
+	BaseOffset, NextOffset uint64 // TODO: Find a good way to describe these
 }
 
 // func nearestMultiple(j, k uint64) uint64 {
@@ -44,7 +45,7 @@ func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
 
 	s := Segment{
 		Config:     c,
-		baseOffset: baseOffset,
+		BaseOffset: baseOffset,
 	}
 
 	path := filepath.Join(dir, fmt.Sprintf("%d%s", baseOffset, ".store"))
@@ -77,17 +78,17 @@ func New(dir string, baseOffset uint64, c Config) (*Segment, error) {
 	//  ^      ^
 	//  base   base+off+1
 	if off, _, err := s.index.Read(-1); err != nil {
-		s.nextOffset = baseOffset
+		s.NextOffset = baseOffset
 	} else {
-		s.nextOffset = baseOffset + uint64(off) + 1
+		s.NextOffset = baseOffset + uint64(off) + 1
 	}
 
 	return &s, nil
 }
 
 // Append adds [record] to its store and index, returning its offset.
-func (s *Segment) Append(record *proto.Record) (uint64, error) {
-	cur := s.nextOffset
+func (s *Segment) Append(record *record.Record) (uint64, error) {
+	cur := s.NextOffset
 	record.Offset = cur
 
 	// Encode the record into binary and persist to the store.
@@ -114,25 +115,25 @@ func (s *Segment) Append(record *proto.Record) (uint64, error) {
 
 	// TODO: I need a picture describing the relationship of these offsets.
 	// Add a nice diagram to the README later.
-	off := uint32(s.nextOffset - uint64(s.baseOffset))
+	off := uint32(s.NextOffset - uint64(s.BaseOffset))
 	if err := s.index.Write(off, pos); err != nil {
 		return 0, err
 	}
 
-	s.nextOffset++
+	s.NextOffset++
 
 	return cur, nil
 }
 
 // Read retrieves the record in its store located at offset [off].
-func (s *Segment) Read(off uint64) (*proto.Record, error) {
+func (s *Segment) Read(off uint64) (*record.Record, error) {
 	c, err := schema.GetCodec(schema.RECORD)
 	if err != nil {
 		return nil, err
 	}
 
 	// Essentially perform the inverse operations of [Append]
-	_, pos, err := s.index.Read(int64(off - s.baseOffset))
+	_, pos, err := s.index.Read(int64(off - s.BaseOffset))
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +161,7 @@ func (s *Segment) Read(off uint64) (*proto.Record, error) {
 		}
 
 		// Let it panic. See if I care...
-		return &proto.Record{
+		return &record.Record{
 			Offset: uint64(offset.(int64)),
 			Value:  value.([]byte),
 		}, nil

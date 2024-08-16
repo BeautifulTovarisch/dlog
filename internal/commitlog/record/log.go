@@ -1,7 +1,10 @@
-// package proto implements a prototype commit log backed with a simple byte
-// slice. This package is intended to serve as a stand-in for development of
-// the API until integrating with the persistent commit log.
-package proto
+// package record exposes a data type representing an entry in the commit log.
+// This serves as the input type to a segment. Route handlers should embed this
+// type in their respective requests.
+//
+// NOTE: This will almost certainly lead to packages which are tightly coupled
+// with this type, but that can be addressed later.
+package record
 
 import (
 	"sync"

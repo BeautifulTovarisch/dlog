@@ -7,7 +7,7 @@ import (
 
 	"github.com/beautifultovarisch/dlog/internal/schema"
 
-	"github.com/beautifultovarisch/dlog/internal/commitlog/proto"
+	"github.com/beautifultovarisch/dlog/internal/commitlog/record"
 )
 
 const (
@@ -46,7 +46,7 @@ func TestSegment(t *testing.T) {
 			t.Errorf("error creating segment: %v", err)
 		}
 
-		if actual := seg.baseOffset; actual != 0 {
+		if actual := seg.BaseOffset; actual != 0 {
 			t.Errorf("expected baseoffset=%d. Got: %d", 0, actual)
 		}
 
@@ -71,7 +71,7 @@ func TestSegment(t *testing.T) {
 
 		msg := []byte("the record")
 
-		record := proto.Record{
+		record := record.Record{
 			Value: msg,
 		}
 
@@ -112,7 +112,7 @@ func TestSegment(t *testing.T) {
 
 	run("Read", func(s *Segment, t *testing.T) {
 		msg := []byte("hello, world!")
-		record := proto.Record{
+		record := record.Record{
 			Value: msg,
 		}
 
@@ -134,7 +134,7 @@ func TestSegment(t *testing.T) {
 	run("Full", func(s *Segment, t *testing.T) {
 		// Insert three records and ensure the segment is full.
 		for i := 0; i < 3; i++ {
-			off, err := s.Append(&proto.Record{})
+			off, err := s.Append(&record.Record{})
 			if err != nil {
 				t.Errorf("error appending record: %d", i)
 			}

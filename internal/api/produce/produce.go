@@ -4,12 +4,12 @@ package produce
 import (
 	"net/http"
 
-	"github.com/beautifultovarisch/dlog/internal/commitlog/proto"
+	"github.com/beautifultovarisch/dlog/internal/commitlog/record"
 )
 
 // Request contains a [Record] to be appended to the commit log.
 type Request struct {
-	Record proto.Record `json:"record"`
+	Record record.Record `json:"record"`
 }
 
 // Response contains the offset of a processed [Record] contained in a [Request]
@@ -20,7 +20,7 @@ type Response struct {
 // Produce accepts a [Request] containing a record and appends it to the commit
 // log. A [Response] containing the offset of the response is returned.
 func Produce(req Request, w http.ResponseWriter, r *http.Request) (*Response, error) {
-	offset, err := proto.Append(req.Record)
+	offset, err := record.Append(req.Record)
 	if err != nil {
 		return nil, err
 	}
